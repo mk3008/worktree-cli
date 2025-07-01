@@ -1,0 +1,38 @@
+{
+  "name": "worktree",
+  "version": "1.0.0",
+  "description": "",
+  "main": "dist/index.js",
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsx src/index.ts",
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "clone": "tsx src/cli.ts clone",
+    "branch": "tsx src/cli.ts branch",
+    "branch:vscode": "tsx src/cli.ts branch-vscode",
+    "create": "tsx src/cli.ts create",
+    "list": "tsx src/cli.ts list",
+    "remove": "tsx src/cli.ts remove",
+    "remove:force": "tsx src/cli.ts remove-force",
+    "help": "tsx src/cli.ts",
+    "wizard": "tsx src/wizard.ts",
+    "menu": "tsx src/wizard.ts"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/mk3008/worktree.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "module",
+  "bugs": {
+    "url": "https://github.com/mk3008/worktree/issues"
+  },
+  "homepage": "https://github.com/mk3008/worktree#readme",
+  "devDependencies": {
+    "@types/node": "^24.0.8",
+    "tsx": "^4.20.3",
+    "typescript": "^5.8.3"
+  }
+}

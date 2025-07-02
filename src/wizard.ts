@@ -10,7 +10,7 @@ const MENU_CONFIG = {
   clone: { icon: '🚀', title: 'Clone Repository', name: 'Clone Repository' },
   branch: { icon: '🌿', title: 'Create New Branch', name: 'Create New Branch' },
   list: { icon: '📋', title: 'List Worktrees', name: 'List Worktrees' },
-  remove: { icon: '🗑️', title: 'Remove Worktree', name: 'Remove Worktree' },
+  remove: { icon: '❌', title: 'Remove Worktree', name: 'Remove Worktree' },
   help: { icon: '❓', title: 'Show CLI Help', name: 'CLI Help' }
 } as const;
 
@@ -173,7 +173,7 @@ const removeWorktreeWizard: WizardOperation = async (menu) => {
     const manager = getManager(repositoryName);
     
     try {
-      console.log(`\n🗑️  Removing worktree ${branchName}...`);
+      console.log(`\n❌ Removing worktree ${branchName}...`);
       await manager.removeWorktree(branchName, false);
       console.log(`✅ Worktree ${branchName} removed successfully`);
     } catch (error) {

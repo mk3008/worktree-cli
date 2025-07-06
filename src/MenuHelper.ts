@@ -104,9 +104,30 @@ export class MenuHelper {
       throw new Error(`Repository ${repositoryName} not found`);
     }
     
-    const branches = readdirSync(repoPath, { withFileTypes: true })
-      .filter(dirent => dirent.isDirectory() && dirent.name !== '.bare')
-      .map(dirent => dirent.name);
+    // Function to recursively find all directories (worktrees)
+    const findWorktrees = (dir: string, prefix: string = ''): string[] => {
+      const entries = readdirSync(dir, { withFileTypes: true });
+      let worktrees: string[] = [];
+      
+      for (const entry of entries) {
+        if (entry.isDirectory() && entry.name !== '.bare') {
+          const fullName = prefix ? `${prefix}/${entry.name}` : entry.name;
+          const fullPath = path.join(dir, entry.name);
+          
+          // Check if this is a git worktree by looking for .git file
+          if (existsSync(path.join(fullPath, '.git'))) {
+            worktrees.push(fullName);
+          } else {
+            // Recursively search subdirectories
+            worktrees = worktrees.concat(findWorktrees(fullPath, fullName));
+          }
+        }
+      }
+      
+      return worktrees;
+    };
+    
+    const branches = findWorktrees(repoPath);
     
     if (branches.length === 0) {
       throw new Error(`No worktrees found in ${repositoryName}`);

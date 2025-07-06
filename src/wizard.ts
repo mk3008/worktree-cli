@@ -9,6 +9,7 @@ import path from 'path';
 const MENU_CONFIG = {
   clone: { icon: '🚀', title: 'Clone Repository', name: 'Clone Repository' },
   branch: { icon: '🌿', title: 'Create New Branch', name: 'Create New Branch' },
+  open: { icon: '📂', title: 'Open Existing Branch in VSCode', name: 'Open Branch' },
   list: { icon: '📋', title: 'List Worktrees', name: 'List Worktrees' },
   remove: { icon: '❌', title: 'Remove Worktree', name: 'Remove Worktree' },
   help: { icon: '❓', title: 'Show CLI Help', name: 'CLI Help' }
@@ -18,6 +19,7 @@ const CLI_COMMANDS = [
   'npm run clone <repository-url>',
   'npm run branch <repo-name> <branch-name> [base]',
   'npm run branch:vscode <repo-name> <branch-name>',
+  'npm run open <repo-name> <branch-name>',
   'npm run list [repo-name]',
   'npm run remove <repo-name> <branch-name>',
   'npm run remove:force <repo-name> <branch-name>'
@@ -58,7 +60,7 @@ function printSectionHeader(config: typeof MENU_CONFIG[OperationKey]): void {
 // Common error handling wrapper
 async function withErrorHandling<T>(
   operation: () => Promise<T>,
-  operationName: string
+  _operationName: string
 ): Promise<boolean> {
   try {
     await operation();
@@ -98,47 +100,94 @@ const createBranchWizard: WizardOperation = async (menu) => {
   
   return withErrorHandling(async () => {
     const repositoryName = await menu.selectRepository();
-    const branchName = await menu.prompt('Enter new branch name');
     
-    if (!branchName) {
-      console.log('❌ Branch name is required');
-      return;
-    }
-    
-    // Get base branch options
-    const repoPath = path.join(process.cwd(), 'repositories', repositoryName);
-    const configManager = new RepositoryConfigManager(repoPath);
-    const defaultBranch = configManager.getDefaultBranch() || 'main';
-    
-    const options: MenuOption[] = [
-      { label: `${defaultBranch} (default)`, value: defaultBranch },
-      { label: 'Choose existing branch', value: 'CHOOSE' }
+    // First ask if they want to create a new branch or open a remote branch
+    const branchTypeOptions: MenuOption[] = [
+      { label: '🌱 Create new branch', value: 'new' },
+      { label: '🌍 Open existing remote branch', value: 'remote' }
     ];
     
-    const baseChoice = await menu.showMenu('Select base branch', options);
-    if (baseChoice === 'CANCEL') {
+    const branchType = await menu.showMenu('What would you like to do?', branchTypeOptions);
+    if (branchType === 'CANCEL') {
       throw new Error('Operation cancelled');
     }
     
-    let baseBranch = baseChoice;
-    if (baseChoice === 'CHOOSE') {
-      baseBranch = await menu.selectWorktree(repositoryName);
-    }
-    
-    const openVscode = await menu.confirm('Open in VSCode after creation?');
-    
     const manager = getManager(repositoryName);
     
-    console.log(`\n🚀 Creating branch ${branchName} from ${baseBranch}...`);
-    await manager.createBranch(branchName, baseBranch, true);
-    
-    const workspacePath = path.join('repositories', repositoryName, branchName);
-    
-    if (openVscode) {
-      await VscodeHelper.promptToOpen(workspacePath);
+    if (branchType === 'remote') {
+      // Handle opening remote branch
+      console.log('\n📡 Fetching remote branches...');
+      const remoteBranches = await manager.listRemoteBranches();
+      
+      if (remoteBranches.length === 0) {
+        console.log('❌ No remote branches found');
+        return;
+      }
+      
+      const branchOptions: MenuOption[] = remoteBranches.map(branch => ({
+        label: branch,
+        value: branch
+      }));
+      
+      const selectedBranch = await menu.showMenu('Select remote branch to open', branchOptions);
+      if (selectedBranch === 'CANCEL') {
+        throw new Error('Operation cancelled');
+      }
+      
+      console.log(`\n🌍 Opening remote branch ${selectedBranch}...`);
+      await manager.openRemoteBranch(selectedBranch);
+      
+      const workspacePath = path.join('repositories', repositoryName, selectedBranch);
+      
+      const openVscode = await menu.confirm('Open in VSCode?');
+      if (openVscode) {
+        await VscodeHelper.promptToOpen(workspacePath);
+      } else {
+        console.log(`✅ Remote branch opened! You can now work in:`);
+        console.log(`   cd ${workspacePath}`);
+      }
     } else {
-      console.log(`✅ Branch created! You can now work in:`);
-      console.log(`   cd ${workspacePath}`);
+      // Handle creating new branch
+      const branchName = await menu.prompt('Enter new branch name');
+      
+      if (!branchName) {
+        console.log('❌ Branch name is required');
+        return;
+      }
+      
+      // Get base branch options
+      const repoPath = path.join(process.cwd(), 'repositories', repositoryName);
+      const configManager = new RepositoryConfigManager(repoPath);
+      const defaultBranch = configManager.getDefaultBranch() || 'main';
+      
+      const options: MenuOption[] = [
+        { label: `${defaultBranch} (default)`, value: defaultBranch },
+        { label: 'Choose existing branch', value: 'CHOOSE' }
+      ];
+      
+      const baseChoice = await menu.showMenu('Select base branch', options);
+      if (baseChoice === 'CANCEL') {
+        throw new Error('Operation cancelled');
+      }
+      
+      let baseBranch = baseChoice;
+      if (baseChoice === 'CHOOSE') {
+        baseBranch = await menu.selectWorktree(repositoryName);
+      }
+      
+      const openVscode = await menu.confirm('Open in VSCode after creation?');
+      
+      console.log(`\n🚀 Creating branch ${branchName} from ${baseBranch}...`);
+      await manager.createBranch(branchName, baseBranch, true);
+      
+      const workspacePath = path.join('repositories', repositoryName, branchName);
+      
+      if (openVscode) {
+        await VscodeHelper.promptToOpen(workspacePath);
+      } else {
+        console.log(`✅ Branch created! You can now work in:`);
+        console.log(`   cd ${workspacePath}`);
+      }
     }
   }, 'Create New Branch');
 };
@@ -194,6 +243,21 @@ const removeWorktreeWizard: WizardOperation = async (menu) => {
   }, 'Remove Worktree');
 };
 
+const openBranchWizard: WizardOperation = async (menu) => {
+  printSectionHeader(MENU_CONFIG.open);
+  
+  return withErrorHandling(async () => {
+    const repositoryName = await menu.selectRepository();
+    const branchName = await menu.selectWorktree(repositoryName);
+    
+    // The directory name might have underscores instead of slashes
+    const workspacePath = path.join('repositories', repositoryName, branchName);
+    
+    console.log(`\n📂 Opening ${repositoryName}/${branchName} in VSCode...`);
+    await VscodeHelper.promptToOpen(workspacePath);
+  }, 'Open Existing Branch');
+};
+
 const showHelpWizard: WizardOperation = async () => {
   console.log('\n📖 CLI Commands:');
   CLI_COMMANDS.forEach(cmd => console.log(`   ${cmd}`));
@@ -204,6 +268,7 @@ const showHelpWizard: WizardOperation = async () => {
 const OPERATIONS: Record<string, WizardOperation> = {
   clone: cloneRepositoryWizard,
   branch: createBranchWizard,
+  open: openBranchWizard,
   list: listWorktreesWizard,
   remove: removeWorktreeWizard,
   help: showHelpWizard

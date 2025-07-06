@@ -14,6 +14,8 @@
     "list": "tsx src/cli.ts list",
     "remove": "tsx src/cli.ts remove",
     "remove:force": "tsx src/cli.ts remove-force",
+    "open": "tsx src/cli.ts open",
+    "open:remote": "tsx src/cli.ts open-remote",
     "help": "tsx src/cli.ts",
     "wizard": "tsx src/wizard.ts",
     "menu": "tsx src/wizard.ts"

@@ -159,6 +159,49 @@ async function main() {
         break;
       }
       
+      case 'open': {
+        const repositoryName = args[1];
+        const branchName = args[2];
+        
+        if (!repositoryName || !branchName) {
+          console.error('Usage: npm run open <repository-name> <branch-name>');
+          console.error('Example: npm run open rawsql-ts feature1');
+          process.exit(1);
+        }
+        
+        const workspacePath = path.join('repositories', repositoryName, branchName);
+        
+        if (!existsSync(path.join(process.cwd(), workspacePath))) {
+          console.error(`Error: Branch '${branchName}' not found in repository '${repositoryName}'`);
+          process.exit(1);
+        }
+        
+        console.log(`Opening ${repositoryName}/${branchName} in VSCode...`);
+        await VscodeHelper.promptToOpen(workspacePath);
+        break;
+      }
+      
+      case 'open-remote': {
+        const repositoryName = args[1];
+        const branchName = args[2];
+        
+        if (!repositoryName || !branchName) {
+          console.error('Usage: npm run open:remote <repository-name> <remote-branch-name>');
+          console.error('Example: npm run open:remote rawsql-ts feature/awesome');
+          process.exit(1);
+        }
+        
+        const manager = getManager(repositoryName);
+        
+        console.log(`Checking remote branch ${branchName}...`);
+        await manager.openRemoteBranch(branchName);
+        
+        const workspacePath = path.join('repositories', repositoryName, branchName);
+        console.log(`Opening ${repositoryName}/${branchName} in VSCode...`);
+        await VscodeHelper.promptToOpen(workspacePath);
+        break;
+      }
+      
       default:
         console.log('Git Worktree Manager');
         console.log('');
@@ -166,6 +209,8 @@ async function main() {
         console.log('  npm run clone <repository-url>                       - Clone a repository');
         console.log('  npm run branch <repo-name> <branch-name> [base]      - Create a new branch');
         console.log('  npm run branch:vscode <repo-name> <branch-name>      - Create branch & open in VSCode');
+        console.log('  npm run open <repo-name> <branch-name>               - Open existing branch in VSCode');
+        console.log('  npm run open:remote <repo-name> <remote-branch>      - Open remote branch in VSCode');
         console.log('  npm run list [repo-name]                             - List worktrees (or all repos)');
         console.log('  npm run remove <repo-name> <branch-name>             - Remove a worktree');
         console.log('  npm run remove:force <repo-name> <branch-name>       - Force remove (discard changes)');
@@ -174,7 +219,9 @@ async function main() {
         console.log('  npm run clone https://github.com/mk3008/rawsql-ts.git');
         console.log('  npm run branch rawsql-ts feature1');
         console.log('  npm run branch rawsql-ts feature2 develop');
-        console.log('  npm run branch:vscode rawsql-ts feature3      # Open in VSCode');
+        console.log('  npm run branch:vscode rawsql-ts feature3      # Create & open in VSCode');
+        console.log('  npm run open rawsql-ts feature1               # Open existing branch in VSCode');
+        console.log('  npm run open:remote rawsql-ts develop         # Open remote branch in VSCode');
         console.log('  npm run list rawsql-ts');
         console.log('  npm run list');
         console.log('  npm run remove rawsql-ts feature1');

@@ -170,10 +170,82 @@ export class WorktreeManager {
       
       console.log(`Worktree ${branchName} removed successfully`);
     } catch (error) {
-      if (!force && error.toString().includes('contains modified or untracked files')) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      if (!force && errorMessage.includes('contains modified or untracked files')) {
         throw new Error(`Worktree contains modified or untracked files. Use 'npm run remove:force ${this.repositoryName} ${branchName}' to force removal.`);
       }
       throw new Error(`Failed to remove worktree: ${error}`);
+    }
+  }
+
+  async listRemoteBranches(): Promise<string[]> {
+    try {
+      if (!existsSync(this.barePath)) {
+        throw new Error(`Repository not found. Please clone first.`);
+      }
+
+      // Fetch latest changes including all refs
+      console.log(`Fetching latest changes...`);
+      await execAsync(`cd "${this.barePath}" && git fetch --prune origin "+refs/heads/*:refs/remotes/origin/*"`);
+
+      // Get all remote branches using a simpler approach
+      const result = await execAsync(`cd "${this.barePath}" && git ls-remote --heads origin`);
+      const branches = result.stdout
+        .split('\n')
+        .filter(line => line.trim())
+        .map(line => {
+          // Each line format: <sha> refs/heads/<branch-name>
+          const match = line.match(/refs\/heads\/(.+)$/);
+          return match ? match[1] : null;
+        })
+        .filter((branch): branch is string => branch !== null);
+
+      return [...new Set(branches)].sort(); // Remove duplicates and sort
+    } catch (error) {
+      throw new Error(`Failed to list remote branches: ${error}`);
+    }
+  }
+
+  async openRemoteBranch(branchName: string): Promise<void> {
+    try {
+      if (!existsSync(this.barePath)) {
+        throw new Error(`Repository not found. Please clone first.`);
+      }
+
+      const worktreePath = path.join(this.repositoryPath, branchName);
+      
+      // Check if worktree already exists
+      if (existsSync(worktreePath)) {
+        console.log(`Worktree for branch ${branchName} already exists at ${worktreePath}`);
+        return;
+      }
+
+      // Fetch latest changes including all refs
+      console.log(`Fetching latest changes...`);
+      await execAsync(`cd "${this.barePath}" && git fetch origin "+refs/heads/*:refs/remotes/origin/*"`);
+
+      // Check if the remote branch exists
+      const remoteBranches = await this.listRemoteBranches();
+      if (!remoteBranches.includes(branchName)) {
+        console.log(`Available remote branches:`);
+        remoteBranches.forEach(branch => console.log(`  - ${branch}`));
+        throw new Error(`Remote branch '${branchName}' not found. Please check the branch name.`);
+      }
+
+      // Create worktree tracking the remote branch
+      console.log(`Creating worktree for remote branch ${branchName}...`);
+      try {
+        // First try to create with the same local branch name
+        await execAsync(`cd "${this.barePath}" && git worktree add "${worktreePath}" -b ${branchName} origin/${branchName}`);
+      } catch (error) {
+        // If branch already exists locally, just track the remote
+        console.log(`Local branch ${branchName} already exists, creating worktree...`);
+        await execAsync(`cd "${this.barePath}" && git worktree add "${worktreePath}" ${branchName}`);
+      }
+      
+      console.log(`Remote branch ${branchName} opened successfully at ${worktreePath}`);
+    } catch (error) {
+      throw new Error(`Failed to open remote branch: ${error}`);
     }
   }
 }
